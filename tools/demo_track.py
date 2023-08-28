@@ -335,7 +335,7 @@ def main(exp, args):
         ckpt = torch.load(ckpt_file, map_location="cpu")
         # load the model state dict
         model.load_state_dict(ckpt["model"])
-        logger.info("loaded checkpoint done.")
+        logger.info(f"Checkpoint {ckpt_file} is loaded.")
 
     if args.fuse:
         logger.info("\tFusing model...")
