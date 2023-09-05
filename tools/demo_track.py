@@ -1,3 +1,6 @@
+import sys
+sys.path.append('/home/baz/ByteTrack/sahi')
+
 import argparse
 import os
 import os.path as osp
@@ -8,14 +11,15 @@ import torch
 from loguru import logger
 
 from yolox.data.data_augment import preproc
+from yolox.data.data_augment import ValTransform
 from yolox.exp import get_exp
 from yolox.utils import fuse_model, get_model_info, postprocess
 from yolox.utils.visualize import plot_tracking
 from yolox.tracker.byte_tracker import BYTETracker
 from yolox.tracking_utils.timer import Timer
 
-from sahi.sahi.predict import get_sliced_prediction
-from sahi.sahi import AutoDetectionModel
+from sahi.predict import get_sliced_prediction
+from sahi import AutoDetectionModel
 
 IMAGE_EXT = [".jpg", ".jpeg", ".webp", ".bmp", ".png"]
 
@@ -64,6 +68,13 @@ def make_parser():
         default=False,
         action="store_true",
         help="Adopting mix precision evaluating.",
+    )
+    parser.add_argument(
+        "--legacy",
+        dest="legacy",
+        default=False,
+        action="store_true",
+        help="To be compatible with older versions",
     )
     parser.add_argument(
         "--fuse",
@@ -124,7 +135,8 @@ class Predictor(object):
         trt_file=None,
         decoder=None,
         device=torch.device("cpu"),
-        fp16=False
+        fp16=False,
+        legacy=False,
     ):
         self.model = model
         self.decoder = decoder
@@ -134,6 +146,7 @@ class Predictor(object):
         self.test_size = exp.test_size
         self.device = device
         self.fp16 = fp16
+        self.preproc = ValTransform(legacy=legacy)
         if trt_file is not None:
             from torch2trt import TRTModule
 
@@ -143,8 +156,8 @@ class Predictor(object):
             x = torch.ones((1, 3, exp.test_size[0], exp.test_size[1]), device=device)
             self.model(x)
             self.model = model_trt
-        self.rgb_means = (0.485, 0.456, 0.406)
-        self.std = (0.229, 0.224, 0.225)
+        self.rgb_means = None #(0.485, 0.456, 0.406)
+        self.std = None #(0.229, 0.224, 0.225)
 
     def inference(self, img, timer):
         img_info = {"id": 0}
@@ -159,7 +172,10 @@ class Predictor(object):
         img_info["width"] = width
         img_info["raw_img"] = img
 
-        img, ratio = preproc(img, self.test_size, self.rgb_means, self.std)
+        ratio = min(self.test_size[0] / img.shape[0], self.test_size[1] / img.shape[1])
+        
+        # img, ratio = preproc(img, self.test_size, self.rgb_means, self.std)
+        img, _ = self.preproc(img, None, self.test_size)
         img_info["ratio"] = ratio
         img = torch.from_numpy(img).unsqueeze(0).float().to(self.device)
         if self.fp16:
@@ -174,6 +190,7 @@ class Predictor(object):
                 outputs, self.num_classes, self.confthre, self.nmsthre
             )
             #logger.info("Infer time: {:.4f}s".format(time.time() - t0))
+        
         return outputs, img_info
 
 
@@ -256,13 +273,34 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
     frame_id = 0
     results = []
     while True:
-        if frame_id % 20 == 0:
-            logger.info('Processing frame {} ({:.2f} fps)'.format(frame_id, 1. / max(1e-5, timer.average_time)))
         ret_val, frame = cap.read()
         if ret_val:
-            outputs, img_info = predictor.inference(frame, timer)
+            # if frame_id == 25:
+            #     break
+            if frame_id % 1 == 0:
+                logger.info('Processing frame {} ({:.2f} fps)'.format(frame_id, 1. / max(1e-5, timer.average_time)))
+            
+            sliced_height, sliced_width = exp.input_size
+            outputs = get_sliced_prediction(
+                frame,
+                predictor,
+                slice_height = sliced_height,
+                slice_width = sliced_width,
+                overlap_height_ratio = 0.2,
+                overlap_width_ratio = 0.2
+            )
+            # outputs, img_info = predictor.inference(frame, timer)
+            predictions = []
+            for prediction in outputs.object_prediction_list:
+                score = prediction.score.value.item()
+                xyxy = prediction.bbox.to_xyxy()
+                predictions.append(xyxy + [score])
+
+            outputs = torch.tensor([predictions])
+
+            height, width, _ = frame.shape
             if outputs[0] is not None:
-                online_targets = tracker.update(outputs[0], [img_info['height'], img_info['width']], exp.test_size)
+                online_targets = tracker.update(outputs[0], [height, width], [height, width])
                 online_tlwhs = []
                 online_ids = []
                 online_scores = []
@@ -279,17 +317,18 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
                         )
                 timer.toc()
                 online_im = plot_tracking(
-                    img_info['raw_img'], online_tlwhs, online_ids, frame_id=frame_id + 1, fps=1. / timer.average_time
+                    frame, online_tlwhs, online_ids, frame_id=frame_id + 1, fps=1. / timer.average_time
                 )
             else:
                 timer.toc()
-                online_im = img_info['raw_img']
+                online_im = frame
             if args.save_result:
                 vid_writer.write(online_im)
             ch = cv2.waitKey(1)
             if ch == 27 or ch == ord("q") or ch == ord("Q"):
                 break
         else:
+            logger.info('frame is not read!')
             break
         frame_id += 1
 
@@ -359,8 +398,19 @@ def main(exp, args):
         trt_file = None
         decoder = None
 
-    predictor = Predictor(model, exp, trt_file, decoder, args.device, args.fp16)
+    # predictor = Predictor(model, exp, trt_file, decoder, args.device, args.fp16,  args.legacy)
+    predictor = AutoDetectionModel.from_pretrained(
+        model_type='yolox',
+        model_path=args.ckpt,
+        config_path=args.exp_file,
+        confidence_threshold=args.conf,
+        nms_threshold=args.nms,
+        device=args.device,
+        classes=['CAR']
+    )
+
     current_time = time.localtime()
+    
     if args.demo == "image":
         image_demo(predictor, vis_folder, current_time, args)
     elif args.demo == "video" or args.demo == "webcam":
