@@ -1,1 +1,5 @@
-python tools/demo_track.py video -f exps/custom/yolox_idp.py -c pretrained/yolox_idp_best.pth --fp16 --fuse --save_result --path /mnt/datasets/idp/2022-10-06T16-34-42/videos/DJI_0777.MP4 
+python tools/demo_track.py video \
+    -f exps/custom/yolox_idp.py \
+    -c pretrained/yolox_idp_best.pth \
+    --path /mnt/datasets/idp/2022-10-06T16-34-42/videos/DJI_0777.MP4 \
+    --fp16 --fuse --save_result 
