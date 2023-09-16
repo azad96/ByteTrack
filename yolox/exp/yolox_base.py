@@ -23,6 +23,8 @@ class Exp(BaseExp):
 
         # ---------------- dataloader config ---------------- #
         # set worker to 4 for shorter dataloader init time
+        self.data_dir = "WRONG_DATA_DIR"
+        self.images = None
         self.data_num_workers = 4
         self.input_size = (640, 640)
         self.random_size = (14, 26)
@@ -89,12 +91,13 @@ class Exp(BaseExp):
         )
 
         dataset = COCODataset(
-            data_dir=None,
+            data_dir=self.data_dir,
             json_file=self.train_ann,
             img_size=self.input_size,
+            name=self.images,
             preproc=TrainTransform(
-                rgb_means=(0.485, 0.456, 0.406),
-                std=(0.229, 0.224, 0.225),
+                # rgb_means=(0.485, 0.456, 0.406),
+                # std=(0.229, 0.224, 0.225),
                 max_labels=50,
             ),
         )

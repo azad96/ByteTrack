@@ -15,6 +15,7 @@ class Exp(MyExp):
 
         # Define yourself dataset path
         self.data_dir = "datasets/2022-10-06T16-34-42"
+        self.images = "images"
         
         # self.train_ann = "coco_annotations.json"
         # self.val_ann = "coco_annotations.json"
@@ -35,28 +36,3 @@ class Exp(MyExp):
         self.data_num_workers = 4
         self.eval_interval = 1
         self.print_interval = 50
-
-    def get_dataset(self, cache: bool = False, cache_type: str = "ram"):
-        """
-        Get dataset according to cache and cache_type parameters.
-        Args:
-            cache (bool): Whether to cache imgs to ram or disk.
-            cache_type (str, optional): Defaults to "ram".
-                "ram" : Caching imgs to ram for fast training.
-                "disk": Caching imgs to disk for fast training.
-        """
-        from yolox.data import COCODataset, TrainTransform
-
-        return COCODataset(
-            data_dir=self.data_dir,
-            json_file=self.train_ann,
-            img_size=self.input_size,
-            preproc=TrainTransform(
-                max_labels=50,
-                flip_prob=self.flip_prob,
-                hsv_prob=self.hsv_prob
-            ),
-            name="images",
-            cache=cache,
-            cache_type=cache_type,
-        )
