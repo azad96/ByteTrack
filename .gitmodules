@@ -1,4 +1,4 @@
 
 [submodule "sahi"]
 	path = sahi
-	url = git@github.com:azad96/sahi.git
+	url = https://github.com:azad96/sahi.git
