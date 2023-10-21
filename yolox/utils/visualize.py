@@ -48,8 +48,16 @@ def get_color(idx):
 
     return color
 
+def get_class_color(idx):
+    if idx == 0:
+        return (67, 212, 38)
+    elif idx == 1:
+        return (235, 155, 52)
+    else:
+        return (51, 19, 232)
 
-def plot_tracking(image, tlwhs, obj_ids, scores=None, frame_id=0, fps=0., ids2=None):
+
+def plot_tracking(image, tlwhs, obj_ids, class_ids, scores=None, frame_id=0, fps=0., ids2=None):
     im = np.ascontiguousarray(np.copy(image))
     im_h, im_w = im.shape[:2]
 
@@ -65,15 +73,16 @@ def plot_tracking(image, tlwhs, obj_ids, scores=None, frame_id=0, fps=0., ids2=N
     radius = max(5, int(im_w/140.))
     cv2.putText(im, 'frame: %d fps: %.2f num: %d' % (frame_id, fps, len(tlwhs)),
                 (0, int(15 * text_scale)), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 255), thickness=2)
-
     for i, tlwh in enumerate(tlwhs):
         x1, y1, w, h = tlwh
         intbox = tuple(map(int, (x1, y1, x1 + w, y1 + h)))
         obj_id = int(obj_ids[i])
+        class_id = int(class_ids[i])
+
         id_text = '{}'.format(int(obj_id))
         if ids2 is not None:
             id_text = id_text + ', {}'.format(int(ids2[i]))
-        color = get_color(abs(obj_id))
+        color = get_class_color(abs(class_id))
         cv2.rectangle(im, intbox[0:2], intbox[2:4], color=color, thickness=line_thickness)
         cv2.putText(im, id_text, (intbox[0], intbox[1]), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 0, 255),
                     thickness=text_thickness)
