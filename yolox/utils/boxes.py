@@ -49,6 +49,7 @@ def postprocess(prediction, num_classes, confidence_dict, nms_thre=0.45):
             image_pred[:, 5 : 5 + num_classes], 1, keepdim=True
         )
         confidence_thresholds = torch.tensor([confidence_dict[i.item()] for i in class_pred])
+        confidence_thresholds = confidence_thresholds.to(image_pred.device)
         conf_mask = (image_pred[:, 4] * class_conf.squeeze() >= confidence_thresholds).squeeze()
 
         # _, conf_mask = torch.topk((image_pred[:, 4] * class_conf.squeeze()), 1000)
