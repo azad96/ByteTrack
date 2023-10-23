@@ -9,7 +9,7 @@ python tools/demo_track.py video \
     --track_buffer 30 \
     --match_thresh 0.85 \
     --aspect_ratio_thresh 40 \
-    --device cpu --save_result 
+    --device gpu --save_result 
 
     --path /mnt/datasets/idp/2022-10-06T16-34-42/videos/DJI_0778.MP4 \
     --tsize 640 \
@@ -19,7 +19,7 @@ python tools/demo_track.py video \
     --track_buffer 30 \
     --match_thresh 0.85 \
     --aspect_ratio_thresh 40 \
-    --device cpu --save_result 
+    --device gpu --save_result 
 
 
 python tools/demo_track.py image \
